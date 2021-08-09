@@ -5,22 +5,28 @@ Created on Sat Jun 26 19:52:46 2021
 @author: ferro
 """
 
-import pandas as pd
+from statsmodels.tsa.stattools import acf, pacf
+import plotly.graph_objects as go
 import numpy as np
-import matplotlib.pyplot as plt
-import plotly.express as px
 
-from sqlalchemy import create_engine
+# Function to create ACF in plotly
+def create_corr_plot(series, plot_pacf=False):
+    corr_array = pacf(series.dropna(), alpha=0.05) if plot_pacf else acf(series.dropna(), alpha=0.05)
+    lower_y = corr_array[1][:,0] - corr_array[0]
+    upper_y = corr_array[1][:,1] - corr_array[0]
 
-# Create engine with the next sintax: dialect+driver://username:password@host:port/database
-# Aquí debería cambiar el root y pasword por json checa TSC
-db_connection_str = "mysql://root:12345akira@localhost/prueba_cryptos"
-db_connection = create_engine(db_connection_str) # DB connection 
-
-# Query data
-crypto = pd.read_sql("SELECT id, time, bitcoin FROM price_usd", con = db_connection)
-crypto
-
-df = px.data.stocks()
-fig = px.line(df, x='date', y="GOOG")
-fig.show()
+    fig = go.Figure()
+    [fig.add_scatter(x=(x,x), y=(0,corr_array[0][x]), mode='lines',line_color='#3f3f3f') 
+     for x in range(len(corr_array[0]))]
+    fig.add_scatter(x=np.arange(len(corr_array[0])), y=corr_array[0], mode='markers', marker_color='#1f77b4',
+                   marker_size=12)
+    fig.add_scatter(x=np.arange(len(corr_array[0])), y=upper_y, mode='lines', line_color='rgba(255,255,255,0)')
+    fig.add_scatter(x=np.arange(len(corr_array[0])), y=lower_y, mode='lines',fillcolor='rgba(32, 146, 230,0.3)',
+            fill='tonexty', line_color='rgba(255,255,255,0)')
+    fig.update_traces(showlegend=False)
+    fig.update_xaxes(range=[-1,42])
+    fig.update_yaxes(zerolinecolor='#000000')
+    
+    title='Partial Autocorrelation (PACF)' if plot_pacf else 'Autocorrelation (ACF)'
+    fig.update_layout(title=title)
+    return fig
